@@ -1,0 +1,4 @@
+telegramToken: ""
+telegramAllowedUsernames: [""]
+openAiApiKey: ""
+fileDownloadPath: ""
