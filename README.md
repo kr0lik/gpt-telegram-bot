@@ -10,6 +10,8 @@ It is now supports:
 - Image Variants
 - Audio Transcription via whisper-1
 
+For audio ffmpeg library required.
+
 **For Use**
 
 Rename `config.yam.dist` to `config.yaml` and fill it

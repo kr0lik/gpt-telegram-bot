@@ -12,6 +12,8 @@ import (
 	"image/png"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 var availableImageSizes = []string{
@@ -43,21 +45,16 @@ func (e Image) GetMaxImageCount() int {
 }
 
 func (e *Image) Edit(imagePath string, instruction string, options editor.ImageOptions, ctx context.Context) ([]string, error) {
-	fileData, err := os.ReadFile(imagePath)
-	if err != nil {
-		return nil, fmt.Errorf("error while readeing image: %v", err)
-	}
-
-	util.DeleteFile(imagePath)
-
-	image, err := e.toPng(fileData)
+	imagePath, err := e.convertImage(imagePath)
 	if err != nil {
 		return nil, fmt.Errorf("error while comvert to png: %v", err)
 	}
 
+	defer util.DeleteFile(imagePath)
+
 	req := request.ImageEdits{
 		Prompt: instruction,
-		Image:  image,
+		Image:  imagePath,
 	}
 
 	if err := e.applyOptions(&req, options); err != nil {
@@ -79,20 +76,15 @@ func (e *Image) Edit(imagePath string, instruction string, options editor.ImageO
 }
 
 func (e *Image) Variations(imagePath string, options editor.ImageOptions, ctx context.Context) ([]string, error) {
-	fileData, err := os.ReadFile(imagePath)
-	if err != nil {
-		return nil, fmt.Errorf("error whil readeing image: %v", err)
-	}
-
-	util.DeleteFile(imagePath)
-
-	image, err := e.toPng(fileData)
+	imagePath, err := e.convertImage(imagePath)
 	if err != nil {
 		return nil, fmt.Errorf("error while comvert to png: %v", err)
 	}
 
+	defer util.DeleteFile(imagePath)
+
 	req := request.ImageVariations{
-		Image: image,
+		Image: imagePath,
 	}
 
 	if err := e.applyOptions(&req, options); err != nil {
@@ -113,45 +105,52 @@ func (e *Image) Variations(imagePath string, options editor.ImageOptions, ctx co
 	return res, nil
 }
 
-func (e *Image) toPng(imageBytes []byte) ([]byte, error) {
-	contentType := http.DetectContentType(imageBytes)
-
-	switch contentType {
-	case "image/png":
-	case "image/jpeg":
-		img, err := jpeg.Decode(bytes.NewReader(imageBytes))
-		if err != nil {
-			return imageBytes, fmt.Errorf("error while decode jpeg: %v", err)
-		}
-
-		buf := new(bytes.Buffer)
-		if err := png.Encode(buf, img); err != nil {
-			return imageBytes, fmt.Errorf("error while encode png: %v", err)
-		}
-
-		return buf.Bytes(), nil
+func (e *Image) convertImage(imagePath string) (string, error) {
+	fileData, err := os.ReadFile(imagePath)
+	if err != nil {
+		return imagePath, fmt.Errorf("error while readeing image: %v", err)
 	}
 
-	return imageBytes, nil
+	contentType := http.DetectContentType(fileData)
+
+	switch contentType {
+	case "image/jpeg":
+		defer util.DeleteFile(imagePath)
+
+		img, err := jpeg.Decode(bytes.NewReader(fileData))
+		if err != nil {
+			return imagePath, fmt.Errorf("error while decode jpeg: %v", err)
+		}
+
+		newImagePath := strings.TrimSuffix(imagePath, "."+filepath.Ext(imagePath)) + ".png"
+
+		file, err := os.Create(newImagePath)
+		if err != nil {
+			return imagePath, fmt.Errorf("error while creating new image file: %v", err)
+		}
+
+		if err := png.Encode(file, img); err != nil {
+			return newImagePath, fmt.Errorf("error while encoding png: %v", err)
+		}
+
+		return newImagePath, nil
+	}
+
+	return imagePath, nil
 }
 
 func (e *Image) applyOptions(req interface{}, options editor.ImageOptions) error {
 	switch dto := req.(type) {
 	case *request.ImageEdits:
 		if options.MaskPath != "" {
-			MaskData, err := os.ReadFile(options.MaskPath)
-			if err != nil {
-				return fmt.Errorf("error while readeing image mask: %v", err)
-			}
-
-			util.DeleteFile(options.MaskPath)
-
-			mask, err := e.toPng(MaskData)
+			MaskPath, err := e.convertImage(options.MaskPath)
 			if err != nil {
 				return fmt.Errorf("error while comvert to png: %v", err)
 			}
 
-			dto.Mask = mask
+			defer util.DeleteFile(MaskPath)
+
+			dto.Mask = MaskPath
 		}
 
 		dto.N = defaultImageCount

@@ -12,6 +12,8 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"reflect"
 )
 
@@ -182,8 +184,8 @@ func (c *Client) preparePayload(request interface{}, contentType *string) (paylo
 		body := new(bytes.Buffer)
 		writer := multipart.NewWriter(body)
 
-		if err := c.multipartFromWrite(writer, request); err != nil {
-			return nil, fmt.Errorf("failed write multipart from data: %v", err)
+		if err := c.multipartFormWrite(writer, request); err != nil {
+			return nil, fmt.Errorf("failed write multipart form data: %v", err)
 		}
 
 		payload = body.Bytes()
@@ -201,18 +203,28 @@ func (c *Client) preparePayload(request interface{}, contentType *string) (paylo
 	return payload, nil
 }
 
-func (c *Client) multipartFromWrite(writer *multipart.Writer, request interface{}) error {
+func (c *Client) multipartFormWrite(writer *multipart.Writer, request interface{}) error {
 	v := reflect.ValueOf(request)
 	typeOfS := v.Type()
 
 	for i := 0; i < v.NumField(); i++ {
 		field := typeOfS.Field(i).Tag.Get("json")
 		value := v.Field(i).Interface()
-		switch value.(type) {
-		case []byte:
-			file := value.([]byte)
-			part, err := writer.CreateFormFile(field, field)
-			if _, err = io.Copy(part, bytes.NewReader(file)); err != nil {
+		switch field {
+		case "file", "image", "mask":
+			filePath := fmt.Sprintf("%v", value)
+
+			part, err := writer.CreateFormFile(field, filepath.Base(filePath))
+			if err != nil {
+				return err
+			}
+
+			file, err := os.Open(filePath)
+			if err != nil {
+				return err
+			}
+
+			if _, err = io.Copy(part, file); err != nil {
 				return err
 			}
 		default:
@@ -265,7 +277,7 @@ func (c *Client) readChatCompletionsStream(resp *http.Response, ch chan *respons
 
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
-			log.Printf("failed read response: %v", err)
+			log.Printf("failed to read response: %v", err)
 			break
 		}
 
@@ -282,7 +294,7 @@ func (c *Client) readChatCompletionsStream(resp *http.Response, ch chan *respons
 		res := new(response.ChatCompletionsAsync)
 
 		if err := json.Unmarshal(line, res); err != nil {
-			log.Printf("failed decode response: %v", err)
+			log.Printf("failed to decode response: %v", err)
 			return
 		}
 

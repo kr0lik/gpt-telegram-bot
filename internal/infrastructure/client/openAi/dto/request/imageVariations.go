@@ -1,7 +1,7 @@
 package request
 
 type ImageVariations struct {
-	Image []byte `json:"image"`
+	Image string `json:"image"`
 	N     int    `json:"n"`
 	Size  string `json:"size"`
 }

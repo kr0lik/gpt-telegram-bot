@@ -27,7 +27,7 @@ type Messaging struct {
 func NewMessaging(
 	messenger service.Messenger,
 	cache service.Cache,
-	Speecher service.Speecher,
+	speech service.Speech,
 	chatGenerator generator.Chat,
 	textGenerator generator.Text,
 	imageGenerator generator.Image,
@@ -55,13 +55,13 @@ func NewMessaging(
 			command.NewSpeech(messenger, cache),
 		},
 		modelHandlers: []model.Handler{
-			model.NewChat(messenger, chatGenerator),
-			model.NewText(messenger, textGenerator),
+			model.NewChat(messenger, chatGenerator, speech),
+			model.NewText(messenger, textGenerator, speech),
 			model.NewTextEdit(messenger, textEditor),
 			model.NewCodeEdit(messenger, codeEditor),
 			model.NewImage(messenger, cache, imageGenerator),
 			model.NewImageEdit(messenger, cache, imageEditor),
-			model.NewSpeech(messenger, cache, Speecher),
+			model.NewSpeech(messenger, cache, speech),
 		},
 	}
 }
