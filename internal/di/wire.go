@@ -15,7 +15,7 @@ import (
 	openAiEditor "gpt-telegran-bot/internal/infrastructure/service/editor/openAi"
 	openAiGenerator "gpt-telegran-bot/internal/infrastructure/service/generator/openAi"
 	"gpt-telegran-bot/internal/infrastructure/service/messenger"
-	openAiSpeech "gpt-telegran-bot/internal/infrastructure/service/speecher/openAi"
+	openAiSpeech "gpt-telegran-bot/internal/infrastructure/service/speech/openAi"
 )
 
 var cacheSet = wire.NewSet(
@@ -47,8 +47,8 @@ var openAiSet = wire.NewSet(
 	openAiEditor.NewImage,
 	wire.Bind(new(editor.Image), new(*openAiEditor.Image)),
 	// speech
-	openAiSpeech.NewSpeecher,
-	wire.Bind(new(service.Speecher), new(*openAiSpeech.Speecher)),
+	openAiSpeech.NewSpeech,
+	wire.Bind(new(service.Speech), new(*openAiSpeech.Speech)),
 )
 
 func InitialiseMessaging() (*usecase.Messaging, error) {

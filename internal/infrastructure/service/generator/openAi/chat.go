@@ -2,7 +2,6 @@ package openAi
 
 import (
 	"context"
-	"fmt"
 	"gpt-telegran-bot/internal/domain/dto"
 	"gpt-telegran-bot/internal/domain/service/generator"
 	"gpt-telegran-bot/internal/infrastructure/client/openAi"
@@ -67,7 +66,7 @@ func (g *Chat) Generate(prompt string, chatId dto.ChatId, ctx context.Context) (
 			return g.Generate(prompt, chatId, ctx)
 		}
 
-		return nil, fmt.Errorf("failed while waiting chatCompletionsAsync response: %v", err)
+		return nil, err
 	}
 
 	resCh := make(chan string)

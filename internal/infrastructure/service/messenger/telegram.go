@@ -8,17 +8,17 @@ import (
 	"gpt-telegran-bot/internal/domain/service"
 	"gpt-telegran-bot/internal/infrastructure/util"
 	"log"
+	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 )
 
 const (
-	getUpdatesTimeout        = 60
-	maxPhotoSize             = 4 * 1024 * 1024
-	maxTelegramMessageLength = 4096
+	telegramUpdatesTimeout   = 60
+	telegramMaxPhotoSize     = 4 * 1024 * 1024
+	telegramMaxMessageLength = 4096
 
-	ParseModeError = "Can't find end of the entity starting at byte offset"
+	telegramParseModeError = "Can't find end of the entity starting at byte offset"
 )
 
 type Telegram struct {
@@ -75,7 +75,7 @@ func (t *Telegram) Listen(ctx context.Context) (service.UpdatesChannel, error) {
 			}
 
 			u := tgbotapi.NewUpdate(0)
-			u.Timeout = getUpdatesTimeout
+			u.Timeout = telegramUpdatesTimeout
 
 			updates, err := t.api.GetUpdatesChan(u)
 			if err != nil {
@@ -84,11 +84,11 @@ func (t *Telegram) Listen(ctx context.Context) (service.UpdatesChannel, error) {
 			}
 
 			for update := range updates {
-				if !t.isAllowedUser(update) {
+				if update.Message == nil || update.Message.Chat == nil {
 					continue
 				}
 
-				if update.Message == nil {
+				if !t.isAllowedUser(update.Message) {
 					continue
 				}
 
@@ -109,14 +109,20 @@ func (t *Telegram) Listen(ctx context.Context) (service.UpdatesChannel, error) {
 	return ch, nil
 }
 
-func (t *Telegram) isAllowedUser(update tgbotapi.Update) bool {
+func (t *Telegram) isAllowedUser(message *tgbotapi.Message) bool {
+	if message.From == nil {
+		t.Send("No user specified", t.chatIdFromTelegram(message.Chat.ID), [][]dto.Command{})
+
+		return false
+	}
+
 	for _, allowedUser := range t.allowedUsers {
-		if allowedUser == update.Message.From.UserName {
+		if allowedUser == message.From.UserName {
 			return true
 		}
 	}
 
-	t.Send(update.Message.From.UserName+" not allowed", t.chatIdFromTelegram(update.Message.Chat.ID), [][]dto.Command{})
+	t.Send(message.From.UserName+" not allowed", t.chatIdFromTelegram(message.Chat.ID), [][]dto.Command{})
 
 	return false
 }
@@ -150,7 +156,7 @@ func (t *Telegram) Replay(message string, replayId dto.MessageId, chatId dto.Cha
 
 	result, err := t.api.Send(msg)
 	if err != nil {
-		if strings.Contains(err.Error(), ParseModeError) {
+		if strings.Contains(err.Error(), telegramParseModeError) {
 			msg.ParseMode = ""
 			result, err := t.api.Send(msg)
 			if err != nil {
@@ -211,7 +217,7 @@ func (t *Telegram) StartEdit(messageId dto.MessageId, newMessage string, replayI
 }
 
 func (t *Telegram) Edit(messageId dto.MessageId, newMessage string, replayId dto.MessageId, chatId dto.ChatId) dto.MessageId {
-	if len(newMessage) > maxTelegramMessageLength {
+	if len(newMessage) > telegramMaxMessageLength {
 		return t.StartEdit(messageId, newMessage, replayId, chatId)
 	}
 
@@ -293,7 +299,7 @@ func (t *Telegram) getImage(update tgbotapi.Update) string {
 		maxSize := 0
 
 		for _, photo := range *update.Message.Photo {
-			if photo.FileSize > maxPhotoSize || photo.FileSize < maxSize {
+			if photo.FileSize > telegramMaxPhotoSize || photo.FileSize < maxSize {
 				continue
 			}
 
@@ -349,7 +355,7 @@ func (t *Telegram) downloadFile(chatId int64, fileId string) (string, error) {
 	}
 
 	folderPath := strings.TrimRight(t.downloadPath, "/") + "/" + string(t.chatIdFromTelegram(chatId))
-	filePath := folderPath + "/" + time.Now().Format("20060201150405")
+	filePath := folderPath + "/" + filepath.Base(file.FilePath)
 
 	if err := util.DownloadFile(file.Link(t.api.Token), filePath); err != nil {
 		return "", err
