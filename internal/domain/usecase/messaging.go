@@ -27,6 +27,7 @@ type Messaging struct {
 func NewMessaging(
 	messenger service.Messenger,
 	cache service.Cache,
+	queue service.Queue,
 	speech service.Speech,
 	chatGenerator generator.Chat,
 	textGenerator generator.Text,
@@ -44,7 +45,6 @@ func NewMessaging(
 			command.NewStatus(messenger, cache, defaultModel),
 			command.NewChat(messenger, cache),
 			command.NewNew(messenger, chatGenerator),
-			command.NewStop(messenger),
 			command.NewText(messenger, cache),
 			command.NewTextEdit(messenger, cache),
 			command.NewCodeEdit(messenger, cache),
@@ -55,7 +55,7 @@ func NewMessaging(
 			command.NewSpeech(messenger, cache),
 		},
 		modelHandlers: []model.Handler{
-			model.NewChat(messenger, chatGenerator, speech),
+			model.NewChat(messenger, chatGenerator, speech, queue),
 			model.NewText(messenger, textGenerator, speech),
 			model.NewTextEdit(messenger, textEditor),
 			model.NewCodeEdit(messenger, codeEditor),
@@ -75,17 +75,19 @@ func (m *Messaging) Start(ctx context.Context) error {
 	log.Print("start listen")
 
 	for update := range updates {
-		go func(update dto.Income) {
-			if update.Command != "" {
-				m.handleCommand(update)
-				return
-			}
-
-			m.handleMessage(update, ctx)
-		}(update)
+		go m.process(update, ctx)
 	}
 
 	return nil
+}
+
+func (m *Messaging) process(update dto.Income, ctx context.Context) {
+	if update.Command != "" {
+		m.handleCommand(update)
+		return
+	}
+
+	m.handleMessage(update, ctx)
 }
 
 func (m *Messaging) handleCommand(update dto.Income) {
@@ -113,6 +115,11 @@ func (m *Messaging) handleMessage(update dto.Income, ctx context.Context) {
 
 	for _, h := range m.modelHandlers {
 		if h.Model() == options.Model {
+			if update.Callback.Id != "" {
+				h.Callback(update, ctx)
+				return
+			}
+
 			h.Handle(update, ctx)
 			return
 		}

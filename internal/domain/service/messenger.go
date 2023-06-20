@@ -16,6 +16,8 @@ type Messenger interface {
 	Replace(messageId dto.MessageId, newMessage string, replayId dto.MessageId, chatId dto.ChatId, commands [][]dto.Command) dto.MessageId
 	ReplaceWithPhotos(messageId dto.MessageId, urls []string, replayId dto.MessageId, chatId dto.ChatId, commands [][]dto.Command) dto.MessageId
 
-	StartEdit(messageId dto.MessageId, newMessage string, replayId dto.MessageId, chatId dto.ChatId) dto.MessageId
-	Edit(messageId dto.MessageId, newMessage string, replayId dto.MessageId, chatId dto.ChatId) dto.MessageId
+	StartEdit(message string, replayId dto.MessageId, chatId dto.ChatId, callbacks [][]dto.Callback, commands [][]dto.Command) dto.MessageId
+	Edit(messageId dto.MessageId, newMessage string, replayId dto.MessageId, chatId dto.ChatId, callbacks [][]dto.Callback, commands [][]dto.Command) dto.MessageId
+
+	Callback(callbackId, message string)
 }

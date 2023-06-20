@@ -33,7 +33,6 @@ func GetContextCommands(model string) [][]dto.Command {
 	case enum.ModelChat:
 		commands = append(commands, []dto.Command{
 			dto.ChatNewCommand,
-			dto.ChatStopCommand,
 		})
 	case enum.ModelImage:
 		commands = append(commands, []dto.Command{

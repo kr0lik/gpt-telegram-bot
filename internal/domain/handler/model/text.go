@@ -33,7 +33,7 @@ func (h *Text) Handle(update dto.Income, ctx context.Context) {
 	replayMessageId := update.MessageId
 
 	if update.Message == "" && update.AudioPath != "" {
-		messageId := h.messenger.Replay("Processing...⏳", replayMessageId, update.ChatId, helper.GetContextCommands(h.Model()))
+		messageId := h.messenger.Replay("Processing...", replayMessageId, update.ChatId, helper.GetContextCommands(h.Model()))
 
 		text, err := h.speech.ToText(update.AudioPath, service.SpeechOptions{}, ctx)
 		if err != nil {
@@ -52,7 +52,7 @@ func (h *Text) Handle(update dto.Income, ctx context.Context) {
 		return
 	}
 
-	messageId := h.messenger.Replay("Processing...⏳", replayMessageId, update.ChatId, helper.GetContextCommands(h.Model()))
+	messageId := h.messenger.Replay("Processing...", replayMessageId, update.ChatId, helper.GetContextCommands(h.Model()))
 
 	result, err := h.generator.Generate(prompt, ctx)
 	if err != nil {
@@ -66,4 +66,8 @@ func (h *Text) Handle(update dto.Income, ctx context.Context) {
 	}
 
 	h.messenger.Replace(messageId, result, replayMessageId, update.ChatId, helper.GetContextCommands(h.Model()))
+}
+
+func (h *Text) Callback(update dto.Income, ctx context.Context) {
+
 }

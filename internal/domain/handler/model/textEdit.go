@@ -47,7 +47,7 @@ func (h *TextEdit) Handle(update dto.Income, ctx context.Context) {
 		return
 	}
 
-	messageId := h.messenger.Replay("Processing...⏳", update.MessageId, update.ChatId, helper.GetContextCommands(h.Model()))
+	messageId := h.messenger.Replay("Processing...", update.MessageId, update.ChatId, helper.GetContextCommands(h.Model()))
 
 	instruction := defaultTextEditInstruction
 	if update.Message != "" {
@@ -87,4 +87,8 @@ func (h *TextEdit) requestInstruction(update dto.Income) {
 		prompt:             update.Message,
 		requestInstruction: messageId,
 	}
+}
+
+func (h *TextEdit) Callback(update dto.Income, ctx context.Context) {
+
 }

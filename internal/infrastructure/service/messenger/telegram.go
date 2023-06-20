@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
@@ -84,24 +85,7 @@ func (t *Telegram) Listen(ctx context.Context) (service.UpdatesChannel, error) {
 			}
 
 			for update := range updates {
-				if update.Message == nil || update.Message.Chat == nil {
-					continue
-				}
-
-				if !t.isAllowedUser(update.Message) {
-					continue
-				}
-
-				ch <- dto.Income{
-					MessageId: t.messageIdFromTelegram(update.Message.MessageID),
-					ChatId:    t.chatIdFromTelegram(update.Message.Chat.ID),
-					UserId:    update.Message.From.UserName,
-					Message:   update.Message.Text,
-					Command:   update.Message.Command(),
-					ImagePath: t.getImage(update),
-					Caption:   update.Message.Caption,
-					AudioPath: t.getAudio(update),
-				}
+				t.processUpdate(ch, &update)
 			}
 		}
 	}()
@@ -109,20 +93,51 @@ func (t *Telegram) Listen(ctx context.Context) (service.UpdatesChannel, error) {
 	return ch, nil
 }
 
-func (t *Telegram) isAllowedUser(message *tgbotapi.Message) bool {
-	if message.From == nil {
-		t.Send("No user specified", t.chatIdFromTelegram(message.Chat.ID), [][]dto.Command{})
+func (t *Telegram) processUpdate(ch chan<- dto.Income, update *tgbotapi.Update) {
+	if update.CallbackQuery != nil {
+		callbackData := strings.Split(update.CallbackQuery.Data, " ")
 
-		return false
+		ch <- dto.Income{
+			MessageId: t.messageIdFromTelegram(update.CallbackQuery.Message.MessageID),
+			ChatId:    t.chatIdFromTelegram(update.CallbackQuery.Message.Chat.ID),
+			UserId:    update.CallbackQuery.Message.ReplyToMessage.Chat.UserName,
+			Callback: dto.IncomeCallback{
+				Id:        update.CallbackQuery.ID,
+				MessageId: dto.MessageId(callbackData[1]),
+				Command:   callbackData[0],
+			},
+		}
 	}
 
+	if update.Message == nil {
+		return
+	}
+
+	if !t.isAllowedUser(update.Message) {
+		return
+	}
+
+	ch <- dto.Income{
+		MessageId: t.messageIdFromTelegram(update.Message.MessageID),
+		ChatId:    t.chatIdFromTelegram(update.Message.Chat.ID),
+		UserId:    update.Message.Chat.UserName,
+		Message:   update.Message.Text,
+		Command:   update.Message.Command(),
+		Callback:  dto.IncomeCallback{},
+		ImagePath: t.getImage(update),
+		Caption:   update.Message.Caption,
+		AudioPath: t.getAudio(update),
+	}
+}
+
+func (t *Telegram) isAllowedUser(message *tgbotapi.Message) bool {
 	for _, allowedUser := range t.allowedUsers {
 		if allowedUser == message.From.UserName {
 			return true
 		}
 	}
 
-	t.Send(message.From.UserName+" not allowed", t.chatIdFromTelegram(message.Chat.ID), [][]dto.Command{})
+	t.Replay(message.From.UserName+" not allowed", t.messageIdFromTelegram(message.MessageID), t.chatIdFromTelegram(message.Chat.ID), [][]dto.Command{})
 
 	return false
 }
@@ -201,32 +216,61 @@ func (t *Telegram) ReplaceWithPhotos(messageId dto.MessageId, urls []string, rep
 	return t.messageIdFromTelegram(result.MessageID)
 }
 
-func (t *Telegram) StartEdit(messageId dto.MessageId, newMessage string, replayId dto.MessageId, chatId dto.ChatId) dto.MessageId {
-	msg := tgbotapi.NewMessage(t.chatIdToTelegram(chatId), newMessage)
+func (t *Telegram) StartEdit(message string, replayId dto.MessageId, chatId dto.ChatId, callbacks [][]dto.Callback, commands [][]dto.Command) dto.MessageId {
+	msg := tgbotapi.NewMessage(t.chatIdToTelegram(chatId), message)
 	msg.ReplyToMessageID = t.messageIdToTelegram(replayId)
 
+	if len(callbacks) > 0 {
+		msg.ReplyMarkup = *t.getInlineKeyboardMarkup(callbacks)
+	}
+
 	result, err := t.api.Send(msg)
-
-	t.delete(messageId, chatId)
-
 	if err != nil {
-		return t.Send(newMessage, chatId, [][]dto.Command{})
+		return t.Send(message, chatId, commands)
 	}
 
 	return t.messageIdFromTelegram(result.MessageID)
 }
 
-func (t *Telegram) Edit(messageId dto.MessageId, newMessage string, replayId dto.MessageId, chatId dto.ChatId) dto.MessageId {
+func (t *Telegram) Edit(messageId dto.MessageId, newMessage string, replayId dto.MessageId, chatId dto.ChatId, callbacks [][]dto.Callback, commands [][]dto.Command) dto.MessageId {
 	if len(newMessage) > telegramMaxMessageLength {
-		return t.StartEdit(messageId, newMessage, replayId, chatId)
+		runes := []rune(newMessage)
+		numRunes := utf8.RuneCountInString(newMessage)
+
+		prevIndex := numRunes - telegramMaxMessageLength*2
+		if prevIndex < 0 {
+			prevIndex = 0
+		}
+
+		prev := string(runes[prevIndex:])
+		replayId := t.Replace(messageId, prev, replayId, chatId, commands)
+
+		lastIndex := numRunes - telegramMaxMessageLength
+		lastText := string(runes[lastIndex:])
+		return t.StartEdit(lastText, replayId, chatId, callbacks, commands)
 	}
 
 	msg := tgbotapi.NewEditMessageText(t.chatIdToTelegram(chatId), t.messageIdToTelegram(messageId), newMessage)
+
+	if len(callbacks) > 0 {
+		msg.ReplyMarkup = t.getInlineKeyboardMarkup(callbacks)
+	}
+
 	if _, err := t.api.Send(msg); err != nil {
-		return t.StartEdit(messageId, newMessage, replayId, chatId)
+		newMessageId := t.StartEdit(newMessage, replayId, chatId, callbacks, commands)
+		t.delete(messageId, chatId)
+		return newMessageId
 	}
 
 	return messageId
+}
+
+func (t *Telegram) Callback(callbackId, message string) {
+	answer := tgbotapi.NewCallback(callbackId, message)
+	_, err := t.api.AnswerCallbackQuery(answer)
+	if err != nil {
+		log.Printf("failed to send callback message: %v", err)
+	}
 }
 
 func (t *Telegram) delete(messageId dto.MessageId, chatId dto.ChatId) {
@@ -284,7 +328,26 @@ func (t *Telegram) getKeyboardMarkup(commands [][]dto.Command) tgbotapi.ReplyKey
 	return tgbotapi.NewReplyKeyboard(buttons...)
 }
 
-func (t *Telegram) getImage(update tgbotapi.Update) string {
+func (t *Telegram) getInlineKeyboardMarkup(callbacks [][]dto.Callback) *tgbotapi.InlineKeyboardMarkup {
+	buttons := make([][]tgbotapi.InlineKeyboardButton, 0)
+
+	for _, row := range callbacks {
+		var buttonRow []tgbotapi.InlineKeyboardButton
+
+		for _, clb := range row {
+			fn := fmt.Sprintf("%s %s", clb.Id, clb.MessageId)
+			buttonRow = append(buttonRow, tgbotapi.NewInlineKeyboardButtonData(clb.Description, fn))
+		}
+
+		buttons = append(buttons, buttonRow)
+	}
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(buttons...)
+
+	return &keyboard
+}
+
+func (t *Telegram) getImage(update *tgbotapi.Update) string {
 	if update.Message.Photo == nil && update.Message.Document == nil {
 		return ""
 	}
@@ -320,7 +383,7 @@ func (t *Telegram) getImage(update tgbotapi.Update) string {
 	return path
 }
 
-func (t *Telegram) getAudio(update tgbotapi.Update) string {
+func (t *Telegram) getAudio(update *tgbotapi.Update) string {
 	if update.Message.Audio == nil && update.Message.Voice == nil {
 		return ""
 	}

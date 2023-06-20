@@ -6,7 +6,6 @@ const (
 	CommandStatus     = "status"
 	CommandChat       = "chat"
 	CommandChatNew    = "new"
-	CommandChatStop   = "stop"
 	CommandText       = "text"
 	CommandTextEdit   = "text_edit"
 	CommandCodeEdit   = "code_edit"

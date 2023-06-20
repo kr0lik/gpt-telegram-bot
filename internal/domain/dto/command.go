@@ -12,9 +12,8 @@ type Command struct {
 var (
 	HelpCommand       = Command{Id: enum.CommandHelp, Description: "Show available commands"}
 	StatusCommand     = Command{Id: enum.CommandStatus, Description: "Show info"}
-	ChatCommand       = Command{Id: enum.CommandChat, Description: "Turn to chat generation model", Sub: []Command{ChatNewCommand, ChatStopCommand}}
-	ChatNewCommand    = Command{Id: enum.CommandChatNew, Description: "New conversation history"}
-	ChatStopCommand   = Command{Id: enum.CommandChatStop, Description: "Stop chat printing"}
+	ChatCommand       = Command{Id: enum.CommandChat, Description: "Turn to chat generation model", Sub: []Command{ChatNewCommand}}
+	ChatNewCommand    = Command{Id: enum.CommandChatNew, Description: "Clear conversation history"}
 	TextCommand       = Command{Id: enum.CommandText, Description: "Turn to text generation model"}
 	TextEditCommand   = Command{Id: enum.CommandTextEdit, Description: "Turn to edit text generation model"}
 	CodeEditCommand   = Command{Id: enum.CommandCodeEdit, Description: "Turn to edit code generation model"}
