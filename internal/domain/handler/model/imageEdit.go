@@ -49,7 +49,7 @@ func (h *ImageEdit) Handle(update dto.Income, ctx context.Context) {
 		return
 	}
 
-	messageId := h.messenger.Replay("Processing...⏳", update.MessageId, update.ChatId, helper.GetContextCommands(h.Model()))
+	messageId := h.messenger.Replay("Processing...", update.MessageId, update.ChatId, helper.GetContextCommands(h.Model()))
 
 	instruction := update.Message
 	if instruction == "" {
@@ -110,4 +110,8 @@ func (h *ImageEdit) requestInstruction(update dto.Income) {
 		imageToEditPath:    update.ImagePath,
 		requestInstruction: messageId,
 	}
+}
+
+func (h *ImageEdit) Callback(update dto.Income, ctx context.Context) {
+
 }

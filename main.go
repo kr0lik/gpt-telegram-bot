@@ -4,12 +4,18 @@ import (
 	"context"
 	"gpt-telegran-bot/internal/di"
 	"gpt-telegran-bot/internal/di/config"
+	"gpt-telegran-bot/internal/domain/usecase"
 	"log"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+)
+
+const (
+	RetryTimeout       = 60
+	MaxInitializeCount = 10
 )
 
 func main() {
@@ -29,17 +35,39 @@ func main() {
 }
 
 func run(ctx context.Context) {
-	useCase, err := di.InitialiseMessaging()
+	useCase, err, failCount := getUseCase()
 	if err != nil {
-		log.Fatalf("failed to initialize messaging: %v", err)
+		log.Fatalf("stop after %d fails", failCount)
 	}
 
 	for {
 		if err := useCase.Start(ctx); err != nil {
 			log.Printf("error on start: %v", err)
-			log.Printf("will try restart after %d secconds", 60)
-			time.Sleep(60 * time.Second)
+			log.Printf("will try restart after %d secconds", RetryTimeout)
+			time.Sleep(RetryTimeout * time.Second)
 		}
+	}
+}
+
+func getUseCase() (*usecase.Messaging, error, int) {
+	failCount := 0
+
+	for {
+		useCase, err := di.InitialiseMessaging()
+		if err != nil {
+			log.Printf("failed to initialize messaging: %v", err)
+
+			if failCount >= MaxInitializeCount {
+				return nil, err, failCount
+			}
+
+			failCount++
+
+			log.Printf("will try restart initializing after %d secconds", RetryTimeout)
+			time.Sleep(RetryTimeout * time.Second)
+		}
+
+		return useCase, err, failCount
 	}
 }
 

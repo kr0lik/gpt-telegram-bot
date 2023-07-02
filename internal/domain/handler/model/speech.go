@@ -33,7 +33,7 @@ func (h *Speech) Handle(update dto.Income, ctx context.Context) {
 		return
 	}
 
-	messageId := h.messenger.Replay("Processing...⏳", update.MessageId, update.ChatId, helper.GetContextCommands(h.Model()))
+	messageId := h.messenger.Replay("Processing...", update.MessageId, update.ChatId, helper.GetContextCommands(h.Model()))
 
 	result, err := h.speech.ToText(update.AudioPath, h.getOpts(update), ctx)
 	if err != nil {
@@ -57,4 +57,8 @@ func (h *Speech) getOpts(update dto.Income) service.SpeechOptions {
 	}
 
 	return *speechOpts
+}
+
+func (h *Speech) Callback(update dto.Income, ctx context.Context) {
+
 }

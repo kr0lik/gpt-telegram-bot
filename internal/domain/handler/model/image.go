@@ -34,7 +34,7 @@ func (h *Image) Handle(update dto.Income, ctx context.Context) {
 		return
 	}
 
-	messageId := h.messenger.Replay("Processing...⏳", update.MessageId, update.ChatId, helper.GetContextCommands(h.Model()))
+	messageId := h.messenger.Replay("Processing...", update.MessageId, update.ChatId, helper.GetContextCommands(h.Model()))
 
 	urls, err := h.generator.Generate(update.Message, h.getOpts(update), ctx)
 	if err != nil {
@@ -60,4 +60,8 @@ func (h *Image) getOpts(update dto.Income) generator.ImageOptions {
 	}
 
 	return *imgOpts
+}
+
+func (h *Image) Callback(update dto.Income, ctx context.Context) {
+
 }

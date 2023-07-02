@@ -15,12 +15,18 @@ import (
 	openAiEditor "gpt-telegran-bot/internal/infrastructure/service/editor/openAi"
 	openAiGenerator "gpt-telegran-bot/internal/infrastructure/service/generator/openAi"
 	"gpt-telegran-bot/internal/infrastructure/service/messenger"
+	openAiQueue "gpt-telegran-bot/internal/infrastructure/service/queue"
 	openAiSpeech "gpt-telegran-bot/internal/infrastructure/service/speech/openAi"
 )
 
 var cacheSet = wire.NewSet(
 	cache.NewMemory,
 	wire.Bind(new(service.Cache), new(*cache.Memory)),
+)
+
+var queueSet = wire.NewSet(
+	openAiQueue.NewOpenAi,
+	wire.Bind(new(service.Queue), new(*openAiQueue.OpenAi)),
 )
 
 var messengerSet = wire.NewSet(
@@ -54,6 +60,7 @@ var openAiSet = wire.NewSet(
 func InitialiseMessaging() (*usecase.Messaging, error) {
 	wire.Build(
 		cacheSet,
+		queueSet,
 		messengerSet,
 		openAiSet,
 		usecase.NewMessaging,

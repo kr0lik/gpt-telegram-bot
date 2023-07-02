@@ -18,6 +18,7 @@ import (
 	openAi4 "gpt-telegran-bot/internal/infrastructure/service/editor/openAi"
 	openAi3 "gpt-telegran-bot/internal/infrastructure/service/generator/openAi"
 	"gpt-telegran-bot/internal/infrastructure/service/messenger"
+	"gpt-telegran-bot/internal/infrastructure/service/queue"
 	openAi2 "gpt-telegran-bot/internal/infrastructure/service/speech/openAi"
 )
 
@@ -30,6 +31,7 @@ func InitialiseMessaging() (*usecase.Messaging, error) {
 		return nil, err
 	}
 	memory := cache.NewMemory()
+	queueOpenAi := queue.NewOpenAi()
 	clientConfig := config.ProvideOpenAiClientConfig()
 	client := openAi.NewClient(clientConfig)
 	speech := openAi2.NewSpeech(client)
@@ -39,13 +41,15 @@ func InitialiseMessaging() (*usecase.Messaging, error) {
 	openAiText := openAi4.NewText(client)
 	code := openAi4.NewCode(client)
 	openAiImage := openAi4.NewImage(client)
-	messaging := usecase.NewMessaging(telegram, memory, speech, chat, text, image, openAiText, code, openAiImage)
+	messaging := usecase.NewMessaging(telegram, memory, queueOpenAi, speech, chat, text, image, openAiText, code, openAiImage)
 	return messaging, nil
 }
 
 // wire.go:
 
 var cacheSet = wire.NewSet(cache.NewMemory, wire.Bind(new(service.Cache), new(*cache.Memory)))
+
+var queueSet = wire.NewSet(queue.NewOpenAi, wire.Bind(new(service.Queue), new(*queue.OpenAi)))
 
 var messengerSet = wire.NewSet(config.ProvideTelegramBotConfig, messenger.NewTelegram, wire.Bind(new(service.Messenger), new(*messenger.Telegram)))
 

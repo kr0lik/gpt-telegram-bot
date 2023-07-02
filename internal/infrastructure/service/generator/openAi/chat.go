@@ -2,6 +2,7 @@ package openAi
 
 import (
 	"context"
+	"fmt"
 	"gpt-telegran-bot/internal/domain/dto"
 	"gpt-telegran-bot/internal/domain/service/generator"
 	"gpt-telegran-bot/internal/infrastructure/client/openAi"
@@ -87,6 +88,11 @@ func (g *Chat) stream(chatId dto.ChatId, respCh <-chan *response.ChatCompletions
 			return
 		case resp, ok := <-respCh:
 			if !ok {
+				return
+			}
+
+			if len(resp.Choices) == 0 {
+				resCh <- fmt.Sprintf("Invalid stream response: %v", resp)
 				return
 			}
 
