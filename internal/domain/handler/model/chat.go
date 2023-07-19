@@ -8,7 +8,6 @@ import (
 	"gpt-telegran-bot/internal/domain/helper"
 	"gpt-telegran-bot/internal/domain/service"
 	"gpt-telegran-bot/internal/domain/service/generator"
-	"sync"
 	"time"
 )
 
@@ -21,7 +20,6 @@ type Chat struct {
 	generator generator.Chat
 	speech    service.Speech
 	queue     service.Queue
-	mu        *sync.Mutex
 }
 
 type output struct {
@@ -35,7 +33,6 @@ func NewChat(messenger service.Messenger, generator generator.Chat, speech servi
 		generator: generator,
 		speech:    speech,
 		queue:     queue,
-		mu:        &sync.Mutex{},
 	}
 }
 
