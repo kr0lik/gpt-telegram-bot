@@ -53,7 +53,7 @@ func getUseCase() (*usecase.Messaging, error, int) {
 	failCount := 0
 
 	for {
-		useCase, err := di.InitialiseMessaging()
+		useCase, err := di.InitialiseOpenAiMessaging()
 		if err != nil {
 			log.Printf("failed to initialize messaging: %v", err)
 

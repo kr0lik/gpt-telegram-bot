@@ -9,6 +9,8 @@ package di
 import (
 	"github.com/google/wire"
 	"gpt-telegran-bot/internal/di/config"
+	"gpt-telegran-bot/internal/domain/handler/command"
+	"gpt-telegran-bot/internal/domain/handler/model"
 	"gpt-telegran-bot/internal/domain/service"
 	"gpt-telegran-bot/internal/domain/service/editor"
 	"gpt-telegran-bot/internal/domain/service/generator"
@@ -16,32 +18,54 @@ import (
 	"gpt-telegran-bot/internal/infrastructure/client/openAi"
 	"gpt-telegran-bot/internal/infrastructure/service/cache"
 	openAi4 "gpt-telegran-bot/internal/infrastructure/service/editor/openAi"
-	openAi3 "gpt-telegran-bot/internal/infrastructure/service/generator/openAi"
+	openAi2 "gpt-telegran-bot/internal/infrastructure/service/generator/openAi"
 	"gpt-telegran-bot/internal/infrastructure/service/messenger"
 	"gpt-telegran-bot/internal/infrastructure/service/queue"
-	openAi2 "gpt-telegran-bot/internal/infrastructure/service/speech/openAi"
+	openAi3 "gpt-telegran-bot/internal/infrastructure/service/speech/openAi"
 )
 
 // Injectors from wire.go:
 
-func InitialiseMessaging() (*usecase.Messaging, error) {
+func InitialiseOpenAiMessaging() (*usecase.Messaging, error) {
 	telegramConfig := config.ProvideTelegramBotConfig()
 	telegram, err := messenger.NewTelegram(telegramConfig)
 	if err != nil {
 		return nil, err
 	}
 	memory := cache.NewMemory()
-	queueOpenAi := queue.NewOpenAi()
+	start := command.NewStart(telegram, memory)
+	help := command.NewHelp(telegram, memory)
+	status := command.NewStatus(telegram, memory)
+	chat := command.NewChat(telegram, memory)
 	clientConfig := config.ProvideOpenAiClientConfig()
 	client := openAi.NewClient(clientConfig)
-	speech := openAi2.NewSpeech(client)
-	chat := openAi3.NewChat(client)
-	text := openAi3.NewText(client)
-	image := openAi3.NewImage(client)
-	openAiText := openAi4.NewText(client)
+	openAiChat := openAi2.NewChat(client)
+	commandNew := command.NewNew(telegram, openAiChat)
+	text := command.NewText(telegram, memory)
+	textEdit := command.NewTextEdit(telegram, memory)
+	codeEdit := command.NewCodeEdit(telegram, memory)
+	image := command.NewImage(telegram, memory)
+	imageEdit := command.NewImageEdit(telegram, memory)
+	openAiImage := openAi2.NewImage(client)
+	size := command.NewSize(telegram, memory, openAiImage)
+	count := command.NewCount(telegram, memory, openAiImage)
+	speech := command.NewSpeech(telegram, memory)
+	v := provideOpenAiCommandList(start, help, status, chat, commandNew, text, textEdit, codeEdit, image, imageEdit, size, count, speech)
+	openAiSpeech := openAi3.NewSpeech(client)
+	queueOpenAi := queue.NewOpenAi()
+	modelChat := model.NewChat(telegram, openAiChat, openAiSpeech, queueOpenAi)
+	openAiText := openAi2.NewText(client)
+	modelText := model.NewText(telegram, openAiText, openAiSpeech)
+	text2 := openAi4.NewText(client)
+	modelTextEdit := model.NewTextEdit(telegram, text2)
 	code := openAi4.NewCode(client)
-	openAiImage := openAi4.NewImage(client)
-	messaging := usecase.NewMessaging(telegram, memory, queueOpenAi, speech, chat, text, image, openAiText, code, openAiImage)
+	modelCodeEdit := model.NewCodeEdit(telegram, code)
+	modelImage := model.NewImage(telegram, memory, openAiImage)
+	image2 := openAi4.NewImage(client)
+	modelImageEdit := model.NewImageEdit(telegram, memory, image2)
+	modelSpeech := model.NewSpeech(telegram, memory, openAiSpeech)
+	v2 := provideOpenAiModelList(modelChat, modelText, modelTextEdit, modelCodeEdit, modelImage, modelImageEdit, modelSpeech)
+	messaging := usecase.NewMessaging(telegram, memory, v, v2)
 	return messaging, nil
 }
 
@@ -53,4 +77,41 @@ var queueSet = wire.NewSet(queue.NewOpenAi, wire.Bind(new(service.Queue), new(*q
 
 var messengerSet = wire.NewSet(config.ProvideTelegramBotConfig, messenger.NewTelegram, wire.Bind(new(service.Messenger), new(*messenger.Telegram)))
 
-var openAiSet = wire.NewSet(config.ProvideOpenAiClientConfig, openAi.NewClient, openAi3.NewChat, wire.Bind(new(generator.Chat), new(*openAi3.Chat)), openAi3.NewText, wire.Bind(new(generator.Text), new(*openAi3.Text)), openAi3.NewImage, wire.Bind(new(generator.Image), new(*openAi3.Image)), openAi4.NewText, wire.Bind(new(editor.Text), new(*openAi4.Text)), openAi4.NewCode, wire.Bind(new(editor.Code), new(*openAi4.Code)), openAi4.NewImage, wire.Bind(new(editor.Image), new(*openAi4.Image)), openAi2.NewSpeech, wire.Bind(new(service.Speech), new(*openAi2.Speech)))
+var commandSet = wire.NewSet(command.NewStart, command.NewHelp, command.NewStatus, command.NewChat, command.NewNew, command.NewText, command.NewTextEdit, command.NewCodeEdit, command.NewImage, command.NewImageEdit, command.NewSize, command.NewCount, command.NewSpeech)
+
+var modelSet = wire.NewSet(model.NewChat, model.NewText, model.NewTextEdit, model.NewCodeEdit, model.NewImage, model.NewImageEdit, model.NewSpeech)
+
+func provideOpenAiCommandList(
+	a *command.Start,
+	b *command.Help,
+	c *command.Status,
+	d *command.Chat,
+	e *command.New,
+	f *command.Text,
+	g *command.TextEdit,
+	h *command.CodeEdit,
+	i *command.Image,
+	j *command.ImageEdit,
+	k *command.Size,
+	l *command.Count,
+	m *command.Speech,
+) []command.Handler {
+	return []command.Handler{a, b, c, d, e, f, g, h, i, j, k, l, m}
+}
+
+func provideOpenAiModelList(
+	a *model.Chat,
+	b *model.Text,
+	c *model.TextEdit,
+	d *model.CodeEdit,
+	e *model.Image,
+	f *model.ImageEdit,
+	g *model.Speech,
+) []model.Handler {
+	return []model.Handler{a, b, c, d, e, f, g}
+}
+
+var openAiSet = wire.NewSet(config.ProvideOpenAiClientConfig, openAi.NewClient, openAi2.NewChat, wire.Bind(new(generator.Chat), new(*openAi2.Chat)), openAi2.NewText, wire.Bind(new(generator.Text), new(*openAi2.Text)), openAi2.NewImage, wire.Bind(new(generator.Image), new(*openAi2.Image)), openAi4.NewText, wire.Bind(new(editor.Text), new(*openAi4.Text)), openAi4.NewCode, wire.Bind(new(editor.Code), new(*openAi4.Code)), openAi4.NewImage, wire.Bind(new(editor.Image), new(*openAi4.Image)), openAi3.NewSpeech, wire.Bind(new(service.Speech), new(*openAi3.Speech)), provideOpenAiCommandList,
+
+	provideOpenAiModelList,
+)
