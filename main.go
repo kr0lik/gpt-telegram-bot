@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"gpt-telegran-bot/internal/di"
-	"gpt-telegran-bot/internal/di/config"
+	"gpt-telegran-bot/di"
+	"gpt-telegran-bot/internal/config"
 	"gpt-telegran-bot/internal/domain/usecase"
 	"log"
 	"os"
@@ -53,7 +53,7 @@ func getUseCase() (*usecase.Messaging, error, int) {
 	failCount := 0
 
 	for {
-		useCase, err := di.InitialiseMessaging()
+		useCase, err := di.InitialiseOpenAiMessaging()
 		if err != nil {
 			log.Printf("failed to initialize messaging: %v", err)
 

@@ -9,8 +9,6 @@ import (
 	"gpt-telegran-bot/internal/domain/handler/model"
 	"gpt-telegran-bot/internal/domain/helper"
 	"gpt-telegran-bot/internal/domain/service"
-	"gpt-telegran-bot/internal/domain/service/editor"
-	"gpt-telegran-bot/internal/domain/service/generator"
 	"log"
 	"strings"
 )
@@ -27,42 +25,14 @@ type Messaging struct {
 func NewMessaging(
 	messenger service.Messenger,
 	cache service.Cache,
-	queue service.Queue,
-	speech service.Speech,
-	chatGenerator generator.Chat,
-	textGenerator generator.Text,
-	imageGenerator generator.Image,
-	textEditor editor.Text,
-	codeEditor editor.Code,
-	imageEditor editor.Image,
+	commandHandlers []command.Handler,
+	modelHandlers []model.Handler,
 ) *Messaging {
 	return &Messaging{
-		messenger: messenger,
-		cache:     cache,
-		commandHandlers: []command.Handler{
-			command.NewStart(messenger, cache),
-			command.NewHelp(messenger, cache),
-			command.NewStatus(messenger, cache, defaultModel),
-			command.NewChat(messenger, cache),
-			command.NewNew(messenger, chatGenerator),
-			command.NewText(messenger, cache),
-			command.NewTextEdit(messenger, cache),
-			command.NewCodeEdit(messenger, cache),
-			command.NewImage(messenger, cache),
-			command.NewImageEdit(messenger, cache),
-			command.NewSize(messenger, cache, imageGenerator),
-			command.NewCount(messenger, cache, imageGenerator),
-			command.NewSpeech(messenger, cache),
-		},
-		modelHandlers: []model.Handler{
-			model.NewChat(messenger, chatGenerator, speech, queue),
-			model.NewText(messenger, textGenerator, speech),
-			model.NewTextEdit(messenger, textEditor),
-			model.NewCodeEdit(messenger, codeEditor),
-			model.NewImage(messenger, cache, imageGenerator),
-			model.NewImageEdit(messenger, cache, imageEditor),
-			model.NewSpeech(messenger, cache, speech),
-		},
+		messenger:       messenger,
+		cache:           cache,
+		commandHandlers: commandHandlers,
+		modelHandlers:   modelHandlers,
 	}
 }
 
@@ -82,6 +52,13 @@ func (m *Messaging) Start(ctx context.Context) error {
 }
 
 func (m *Messaging) process(update dto.Income, ctx context.Context) {
+	options := m.cache.Get(update.ChatId)
+	if options.Model == "" {
+		options.Model = defaultModel
+
+		m.cache.Set(update.ChatId, options)
+	}
+
 	if update.Command != "" {
 		m.handleCommand(update)
 		return
@@ -107,11 +84,6 @@ func (m *Messaging) handleCommand(update dto.Income) {
 
 func (m *Messaging) handleMessage(update dto.Income, ctx context.Context) {
 	options := m.cache.Get(update.ChatId)
-	if options.Model == "" {
-		options.Model = defaultModel
-
-		m.cache.Set(update.ChatId, options)
-	}
 
 	for _, h := range m.modelHandlers {
 		if h.Model() == options.Model {

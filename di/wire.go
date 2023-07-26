@@ -5,7 +5,9 @@ package di
 
 import (
 	"github.com/google/wire"
-	"gpt-telegran-bot/internal/di/config"
+	"gpt-telegran-bot/internal/config"
+	"gpt-telegran-bot/internal/domain/handler/command"
+	"gpt-telegran-bot/internal/domain/handler/model"
 	"gpt-telegran-bot/internal/domain/service"
 	"gpt-telegran-bot/internal/domain/service/editor"
 	"gpt-telegran-bot/internal/domain/service/generator"
@@ -35,6 +37,62 @@ var messengerSet = wire.NewSet(
 	wire.Bind(new(service.Messenger), new(*messenger.Telegram)),
 )
 
+var commandSet = wire.NewSet(
+	command.NewStart,
+	command.NewHelp,
+	command.NewStatus,
+	command.NewChat,
+	command.NewNew,
+	command.NewText,
+	command.NewTextEdit,
+	command.NewCodeEdit,
+	command.NewImage,
+	command.NewImageEdit,
+	command.NewSize,
+	command.NewCount,
+	command.NewSpeech,
+)
+
+var modelSet = wire.NewSet(
+	model.NewChat,
+	model.NewText,
+	model.NewTextEdit,
+	model.NewCodeEdit,
+	model.NewImage,
+	model.NewImageEdit,
+	model.NewSpeech,
+)
+
+func provideOpenAiCommandList(
+	a *command.Start,
+	b *command.Help,
+	c *command.Status,
+	d *command.Chat,
+	e *command.New,
+	f *command.Text,
+	g *command.TextEdit,
+	h *command.CodeEdit,
+	i *command.Image,
+	j *command.ImageEdit,
+	k *command.Size,
+	l *command.Count,
+	m *command.Speech,
+) []command.Handler {
+	return []command.Handler{a, b, c, d, e, f, g, h, i, j, k, l, m}
+}
+
+func provideOpenAiModelList(
+	a *model.Chat,
+	b *model.Text,
+	c *model.TextEdit,
+	d *model.CodeEdit,
+	e *model.Image,
+	f *model.ImageEdit,
+	g *model.Speech,
+) []model.Handler {
+	return []model.Handler{a, b, c, d, e, f, g}
+}
+
 var openAiSet = wire.NewSet(
 	config.ProvideOpenAiClientConfig,
 	openAiClient.NewClient,
@@ -55,13 +113,19 @@ var openAiSet = wire.NewSet(
 	// speech
 	openAiSpeech.NewSpeech,
 	wire.Bind(new(service.Speech), new(*openAiSpeech.Speech)),
+	// Commands
+	provideOpenAiCommandList,
+	// Models
+	provideOpenAiModelList,
 )
 
-func InitialiseMessaging() (*usecase.Messaging, error) {
+func InitialiseOpenAiMessaging() (*usecase.Messaging, error) {
 	wire.Build(
 		cacheSet,
 		queueSet,
 		messengerSet,
+		commandSet,
+		modelSet,
 		openAiSet,
 		usecase.NewMessaging,
 	)

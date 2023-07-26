@@ -9,16 +9,14 @@ import (
 )
 
 type Status struct {
-	messenger    service.Messenger
-	cache        service.Cache
-	defaultModel string
+	messenger service.Messenger
+	cache     service.Cache
 }
 
-func NewStatus(messenger service.Messenger, cache service.Cache, defaultModel string) *Status {
+func NewStatus(messenger service.Messenger, cache service.Cache) *Status {
 	return &Status{
-		messenger:    messenger,
-		cache:        cache,
-		defaultModel: defaultModel,
+		messenger: messenger,
+		cache:     cache,
 	}
 }
 
@@ -29,10 +27,10 @@ func (c *Status) Id() string {
 func (c *Status) Process(update dto.Income) {
 	opts := c.cache.Get(update.ChatId)
 
-	text := "Current model: " + opts.Model
+	text := ""
 
-	if opts.Model == "" {
-		text = "Current model: " + c.defaultModel
+	if opts.Model != "" {
+		text = "Current model: " + opts.Model
 	}
 
 	if opts.Image.Size != "" {
