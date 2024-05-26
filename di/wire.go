@@ -64,33 +64,55 @@ var modelSet = wire.NewSet(
 )
 
 func provideOpenAiCommandList(
-	a *command.Start,
-	b *command.Help,
-	c *command.Status,
-	d *command.Chat,
-	e *command.New,
-	f *command.Text,
-	g *command.TextEdit,
-	h *command.CodeEdit,
-	i *command.Image,
-	j *command.ImageEdit,
-	k *command.Size,
-	l *command.Count,
-	m *command.Speech,
+	start *command.Start,
+	help *command.Help,
+	status *command.Status,
+	chat *command.Chat,
+	new *command.New,
+	text *command.Text,
+	textEdit *command.TextEdit,
+	codeEdit *command.CodeEdit,
+	image *command.Image,
+	imageEdit *command.ImageEdit,
+	size *command.Size,
+	count *command.Count,
+	speech *command.Speech,
 ) []command.Handler {
-	return []command.Handler{a, b, c, d, e, f, g, h, i, j, k, l, m}
+	return []command.Handler{
+		start,
+		help,
+		status,
+		chat,
+		new,
+		text,
+		textEdit,
+		codeEdit,
+		image,
+		imageEdit,
+		size,
+		count,
+		speech,
+	}
 }
 
 func provideOpenAiModelList(
-	a *model.Chat,
-	b *model.Text,
-	c *model.TextEdit,
-	d *model.CodeEdit,
-	e *model.Image,
-	f *model.ImageEdit,
-	g *model.Speech,
+	chat *model.Chat,
+	text *model.Text,
+	textEdit *model.TextEdit,
+	codeEdit *model.CodeEdit,
+	image *model.Image,
+	imageEdit *model.ImageEdit,
+	speech *model.Speech,
 ) []model.Handler {
-	return []model.Handler{a, b, c, d, e, f, g}
+	return []model.Handler{
+		chat,
+		text,
+		textEdit,
+		codeEdit,
+		image,
+		imageEdit,
+		speech,
+	}
 }
 
 var openAiSet = wire.NewSet(
