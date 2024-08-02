@@ -2,3 +2,4 @@ telegramToken: ""
 telegramAllowedUsernames: [""]
 openAiApiKey: ""
 fileDownloadPath: ""
+proxyDsn: ""

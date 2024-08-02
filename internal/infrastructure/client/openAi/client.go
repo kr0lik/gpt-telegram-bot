@@ -6,19 +6,23 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/net/proxy"
 	"gpt-telegran-bot/internal/infrastructure/client/openAi/dto/request"
 	"gpt-telegran-bot/internal/infrastructure/client/openAi/dto/response"
 	"io"
 	"log"
 	"mime/multipart"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 )
 
 const (
-	apiHost         = "https://api.openai.com/v1/"
+	apiHost         = "https://api.openai.com/v1"
 	jsonContentType = "application/json"
 	dataContentType = "multipart/form-data"
 )
@@ -34,18 +38,57 @@ type Client struct {
 }
 
 type ClientConfig struct {
-	ApiKey string
+	ApiKey   string
+	ProxyDsn string
 }
 
-func NewClient(config *ClientConfig) *Client {
+func NewClient(config *ClientConfig) (*Client, error) {
+	transport := http.Transport{}
+
+	if config.ProxyDsn != "" {
+		proxyURL, err := url.Parse(config.ProxyDsn)
+		if err != nil {
+			return nil, fmt.Errorf("invalid proxy dsn: %v", err)
+		}
+
+		transport.Proxy = http.ProxyURL(proxyURL)
+	}
+
 	return &Client{
 		apiKey: config.ApiKey,
-		client: &http.Client{},
+		client: &http.Client{Transport: &transport},
+	}, nil
+}
+
+func getSocks5Transport(config *ClientConfig) *http.Transport {
+	if config.ProxyDsn == "" {
+		return &http.Transport{}
+	}
+
+	if !strings.Contains(config.ProxyDsn, "socks5://") {
+		fmt.Printf("Invalid format of proxy: %v, expected: socks5://host:port", config.ProxyDsn)
+		return &http.Transport{}
+	}
+
+	proxyHost := strings.Replace(config.ProxyDsn, "socks5://", "", 1)
+
+	dialer, err := proxy.SOCKS5("tcp", proxyHost, nil, proxy.Direct)
+	if err != nil {
+		fmt.Printf("Proxy connect error: %v\n", err)
+		return &http.Transport{}
+	}
+
+	dialContext := func(ctx context.Context, network, address string) (net.Conn, error) {
+		return dialer.Dial(network, address)
+	}
+
+	return &http.Transport{
+		DialContext: dialContext,
 	}
 }
 
 func (c *Client) GetChatCompletions(request request.ChatCompletions, ctx context.Context) (*response.ChatCompletions, error) {
-	resp, err := c.request("POST", "chat/completions", jsonContentType, request, ctx)
+	resp, err := c.request("POST", "/chat/completions", jsonContentType, request, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed call chat/completions: %v", err)
 	}
@@ -60,7 +103,7 @@ func (c *Client) GetChatCompletions(request request.ChatCompletions, ctx context
 func (c *Client) GetChatCompletionsStream(request request.ChatCompletionsAsync, ctx context.Context) (<-chan *response.ChatCompletionsAsync, error) {
 	request.Stream = true
 
-	resp, err := c.request("POST", "chat/completions", jsonContentType, request, ctx)
+	resp, err := c.request("POST", "/chat/completions", jsonContentType, request, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed call chat/completions: %v", err)
 	}
@@ -73,7 +116,7 @@ func (c *Client) GetChatCompletionsStream(request request.ChatCompletionsAsync, 
 }
 
 func (c *Client) GetCompletions(request request.Completions, ctx context.Context) (*response.Completions, error) {
-	resp, err := c.request("POST", "completions", jsonContentType, request, ctx)
+	resp, err := c.request("POST", "/completions", jsonContentType, request, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed call completions: %v", err)
 	}
@@ -86,7 +129,7 @@ func (c *Client) GetCompletions(request request.Completions, ctx context.Context
 }
 
 func (c *Client) EditText(request request.Edits, ctx context.Context) (*response.Edits, error) {
-	resp, err := c.request("POST", "edits", jsonContentType, request, ctx)
+	resp, err := c.request("POST", "/edits", jsonContentType, request, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed call edits: %v", err)
 	}
@@ -99,7 +142,7 @@ func (c *Client) EditText(request request.Edits, ctx context.Context) (*response
 }
 
 func (c *Client) GetImages(request request.ImageGenerations, ctx context.Context) (*response.ImageGenerations, error) {
-	resp, err := c.request("POST", "images/generations", jsonContentType, request, ctx)
+	resp, err := c.request("POST", "/images/generations", jsonContentType, request, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed call images/generations: %v", err)
 	}
@@ -112,7 +155,7 @@ func (c *Client) GetImages(request request.ImageGenerations, ctx context.Context
 }
 
 func (c *Client) GetImageEdits(request request.ImageEdits, ctx context.Context) (*response.ImageEdits, error) {
-	resp, err := c.request("POST", "images/edits", dataContentType, request, ctx)
+	resp, err := c.request("POST", "/images/edits", dataContentType, request, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed call images/edits: %v", err)
 	}
@@ -125,7 +168,7 @@ func (c *Client) GetImageEdits(request request.ImageEdits, ctx context.Context) 
 }
 
 func (c *Client) GetImageVariations(request request.ImageVariations, ctx context.Context) (*response.ImageVariations, error) {
-	resp, err := c.request("POST", "images/variations", dataContentType, request, ctx)
+	resp, err := c.request("POST", "/images/variations", dataContentType, request, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed call images/variations: %v", err)
 	}
@@ -138,7 +181,7 @@ func (c *Client) GetImageVariations(request request.ImageVariations, ctx context
 }
 
 func (c *Client) GetAudioTranscription(request request.AudioTranscriptions, ctx context.Context) (*response.AudioTranscriptions, error) {
-	resp, err := c.request("POST", "audio/transcriptions", dataContentType, request, ctx)
+	resp, err := c.request("POST", "/audio/transcriptions", dataContentType, request, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed call audio/transcriptions: %v", err)
 	}

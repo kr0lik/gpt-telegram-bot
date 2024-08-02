@@ -15,6 +15,7 @@ type Config struct {
 	TelegramAllowedUsernames []string `yaml:"telegramAllowedUsernames"`
 	OpenAIKey                string   `yaml:"openAiApiKey"`
 	FileDownloadPath         string   `yaml:"fileDownloadPath"`
+	ProxyDsn                 string   `yaml:"proxyDsn"`
 }
 
 func ReadConfig(configPath string) error {
@@ -43,6 +44,7 @@ func ProvideTelegramBotConfig() *messenger.TelegramConfig {
 
 func ProvideOpenAiClientConfig() *openAi.ClientConfig {
 	return &openAi.ClientConfig{
-		ApiKey: main.OpenAIKey,
+		ApiKey:   main.OpenAIKey,
+		ProxyDsn: main.ProxyDsn,
 	}
 }
